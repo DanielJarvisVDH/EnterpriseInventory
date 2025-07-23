@@ -16,7 +16,7 @@ server_name = socket.gethostname()
 # Path to DB where your inventory tables are stored
 inventoryDatabase = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde"
 # ArcGIS Online Table
-AGOInventoryTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryAGODataSources"
+agoInventoryTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryAGODataSources"
 # ArcGIS Server Table
 arcGISServerInventoryTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryArcGISServer"
 # Domain Names Types and Values Table
@@ -26,7 +26,7 @@ domainUsageTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/
 # Database Content Table
 databaseInventoryTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryDatabaseContent"
 # APRX REST Service Map Files Table
-RESTAprxDatabaseTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryRESTServiceMapFileData"
+restAprxDatabaseTable = f"//{server_name}/d/PythonScripts/SDEFiles/AHS_PROD_EPHT.sde/EnterpriseInventoryRESTServiceMapFileData"
 # SDE File Directory
 databaseFileDirectory = f"//{server_name}/d/PythonScripts/SDEFiles"
 # SDE File Names
@@ -58,7 +58,7 @@ AGS_Base_URLs = ["https://maps.healthvermont.gov","https://mapstest.healthvermon
 
 
 # ArcGIS Online Function
-def GetAGODataSources(AGO_url, AGOInventoryTable, agoUsername, agoPassword):
+def GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword):
     """
     Connects to ArcGIS Online, inventories all items, and interrogates each item
     for its underlying data sources. The results, including item details and the
@@ -206,11 +206,11 @@ def GetAGODataSources(AGO_url, AGOInventoryTable, agoUsername, agoPassword):
 
     try:
         # Clear the SQL table for updated data
-        arcpy.management.TruncateTable(AGOInventoryTable)
+        arcpy.management.TruncateTable(agoInventoryTable)
         
         # Insert all collected items
         fields = ["ItemID", "ItemType", "ItemName", "ItemURL", "AGOAccount", "AGOAccountFolder", "LayerName", "LayerURL"]
-        with arcpy.da.InsertCursor(AGOInventoryTable, fields) as insertCursor:
+        with arcpy.da.InsertCursor(agoInventoryTable, fields) as insertCursor:
             for row_data in comprehensive_data_store:
                 insertCursor.insertRow(row_data)
 
@@ -370,9 +370,9 @@ def GetArcGISProRESTData(RESTAprxDirectory):
     # ArcGIS Pro Documents REST Directory ====================
     root_path = Path(RESTAprxDirectory)
     aprx_files = list(root_path.rglob('*.aprx'))
-    arcpy.management.DeleteRows(RESTAprxDatabaseTable)
-    AprxRESTfields = ["path_windows", "mapName", "layerName", "layerID", "ServerName", "DatabaseName", "DatasetName", "Datasource"]
-    with arcpy.da.InsertCursor(RESTAprxDatabaseTable, AprxRESTfields) as insertCursor:
+    arcpy.management.DeleteRows(restAprxDatabaseTable)
+    aprxRESTfields = ["path_windows", "mapName", "layerName", "layerID", "ServerName", "DatabaseName", "DatasetName", "Datasource"]
+    with arcpy.da.InsertCursor(restAprxDatabaseTable, aprxRESTfields) as insertCursor:
         for aprx_file in aprx_files:
             aprx_file_str = str(aprx_file).replace("\\", "/")
 
@@ -484,7 +484,7 @@ def UpdateDatabaseContentTable(databaseInventoryTable):
 # Main Function
 def main():
     print("Updating AGO Data Sources...")
-    GetAGODataSources(AGO_url, AGOInventoryTable, agoUsername, agoPassword)
+    GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword)
 
     print("Updating ArcGIS Server Data...")
     GetArcGISServerData(arcGISServerInventoryTable, AGS_Base_URLs, agsUsername, agsPassword)
