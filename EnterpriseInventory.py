@@ -53,12 +53,12 @@ with open(agoCredsFile, 'r') as f:
     agoPassword = agoCreds[1]
 
 # ArcGIS Online URL and base URLs for ArcGIS Server
-AGO_url = "https://ahs-vt.maps.arcgis.com/"
-AGS_Base_URLs = ["https://maps.healthvermont.gov","https://mapstest.healthvermont.gov"]
+ago_url = "https://ahs-vt.maps.arcgis.com/"
+ags_Base_URLs = ["https://maps.healthvermont.gov","https://mapstest.healthvermont.gov"]
 
 
 # ArcGIS Online Function
-def GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword):
+def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
     """
     Connects to ArcGIS Online, inventories all items, and interrogates each item
     for its underlying data sources. The results, including item details and the
@@ -71,7 +71,7 @@ def GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword):
     # Container for all data prior to SQL insertion    
     comprehensive_data_store = []
 
-    gis = GIS(AGO_url, agoUsername, agoPassword)
+    gis = GIS(ago_url, agoUsername, agoPassword)
     parent_url = gis.url
  
     # Get all users for the environment
@@ -219,7 +219,7 @@ def GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword):
         print("Data was collected but the database could not be updated. The table may be empty or in an inconsistent state.")
 
 # ArcGIS Server Function
-def GetArcGISServerData(arcGISServerInventoryTable, AGS_Base_URLs, agsUsername, agsPassword):
+def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword):
     """ Connects to ArcGIS Server instances, retrieves service information,
     and writes service details to a SQL table.
     """
@@ -227,10 +227,10 @@ def GetArcGISServerData(arcGISServerInventoryTable, AGS_Base_URLs, agsUsername, 
     # List to store service information
     services_info = []
 
-    for AGS_Base_URL in AGS_Base_URLs:
+    for ags_Base_URL in ags_Base_URLs:
 
-        server = Server(url=f"{AGS_Base_URL}/arcgis/admin",
-                            token_url=f"{AGS_Base_URL}/arcgis/tokens/generateToken",
+        server = Server(url=f"{ags_Base_URL}/arcgis/admin",
+                            token_url=f"{ags_Base_URL}/arcgis/tokens/generateToken",
                             username=agsUsername,
                             password=agsPassword,)
         
@@ -252,7 +252,7 @@ def GetArcGISServerData(arcGISServerInventoryTable, AGS_Base_URLs, agsUsername, 
                     folderDirectory = f"/{folder}/"
 
                 # Get service details
-                service_url = f"{AGS_Base_URL}/arcgis/rest/services{folderDirectory}{serviceName}/{serviceType}"
+                service_url = f"{ags_Base_URL}/arcgis/rest/services{folderDirectory}{serviceName}/{serviceType}"
                 
                 # Request the service details
                 response = requests.get(f"{service_url}?f=json")
@@ -484,10 +484,10 @@ def UpdateDatabaseContentTable(databaseInventoryTable):
 # Main Function
 def main():
     print("Updating AGO Data Sources...")
-    GetAGODataSources(AGO_url, agoInventoryTable, agoUsername, agoPassword)
+    GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword)
 
     print("Updating ArcGIS Server Data...")
-    GetArcGISServerData(arcGISServerInventoryTable, AGS_Base_URLs, agsUsername, agsPassword)
+    GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword)
 
     print("Updating Domain Data...")
     GetDomainData(domainTable,databaseFileDirectory,domainUsageTable)
