@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Inventory Explorer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="login-container" class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title text-center">🕸️ Enterprise Inventory Explorer</h3>
+                        <p class="text-center text-muted">Please sign in to your ArcGIS Server</p>
+                        <div id="login-error" class="alert alert-danger d-none" role="alert" aria-live="polite"></div>
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" value="">
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password">
+                        </div>
+                        <div class="d-grid">
+                            <button id="login-button" class="btn btn-primary">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Sign In
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                 <p class="text-center text-muted small mt-3">This application runs entirely in your browser. Your credentials are sent directly to the ArcGIS Server token service and are not stored.</p>
+            </div>
+        </div>
+    </div>
+    <div id="app-container" class="d-none">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">🕸️ Enterprise Inventory Explorer</a>
+            </div>
+        </nav>
+        <div id="main-layout">
+            <div id="search-pane">
+                <div class="p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">Search & Filter</h4>
+                        <button id="clear-all-button" class="btn btn-sm btn-outline-danger" title="Clear all searches and filters">Clear All</button>
+                    </div>
+                    <h5>1. Search for a Specific Asset</h5>
+                    <p class="text-muted small">Search for a Datasource, Service URL, AGO Item, or Domain Name.</p>
+                    <div id="global-search-wrapper">
+                        <div class="input-group mb-2">
+                             <input type="search" class="form-control" id="global-search-input" placeholder="Search key fields...">
+                             <button class="btn btn-outline-secondary" type="button" id="global-search-button">
+                                 <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                 Search
+                             </button>
+                        </div>
+                        <div id="global-search-results-container">
+                        </div>
+                    </div>
+                    <div id="global-search-selection-info" class="alert alert-info p-2 mt-2 d-none" role="alert"></div>
+                    <hr>
+                    <h5>2. Select & Filter</h5>
+                    <div class="mb-3">
+                        <label for="start-table-select" class="form-label">Select starting table:</label>
+                        <select id="start-table-select"></select>
+                    </div>
+                    <div id="filter-controls"></div>
+                    <hr>
+                    <h5>3. Analyze Relationships</h5>
+                     <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="loopback-checkbox">
+                        <label class="form-check-label" for="loopback-checkbox">Allow loopback to start layer</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                       <input class="form-check-input" type="checkbox" role="switch" id="bidirectional-checkbox">
+                       <label class="form-check-label" for="bidirectional-checkbox">Enable Bi-Directional Tracing</label>
+                   </div>
+                    <div class="d-grid">
+                        <button id="trace-button" class="btn btn-success" disabled>Show Relationships</button>
+                    </div>
+                    <div id="relationship-controls-container" class="mt-4 d-none">
+                        <h5 class="mb-2">Toggle Visible Relationships</h5>
+                        <div id="relationship-toggles" class="list-group">
+                        </div>
+                    </div>
+                    <hr>
+                    <h5>4. Generate Reports</h5>
+                    <div class="d-grid">
+                        <button id="orphan-report-button" class="btn btn-info" disabled>
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            <span>Generate Orphan Report</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="resizer-wrapper">
+                <div id="resizer"></div>
+                <button id="toggle-pane-btn" class="btn btn-sm btn-light" title="Collapse Pane" aria-label="Collapse Pane">«</button>
+            </div>
+            <div id="main-content" class="p-3">
+                <div id="view-switcher" class="btn-group mb-3 d-none" role="group">
+                    <button type="button" id="view-table-btn" class="btn btn-outline-primary active">Table View</button>
+                    <button type="button" id="view-graph-btn" class="btn btn-outline-primary">Graph View</button>
+                </div>
+                <div id="results-container">
+                    <div class="alert alert-info">Use the controls on the left to find a record and trace its relationships.</div>
+                </div>
+                <div id="graph-container" class="d-none"></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="node-details-modal" tabindex="-1" aria-labelledby="nodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="node-modal-title">Node Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="node-modal-body"></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js" defer></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" defer></script>
+    <script src="app.js" defer></script>
+</body>
+</html>
