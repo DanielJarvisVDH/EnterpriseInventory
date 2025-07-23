@@ -36,7 +36,7 @@ databaseFileNames = ["ADAP_DEV_Admin.sde","ADAP_TEST_Admin.sde","ADAP_PROD_Admin
                      "HOC_DEV_Admin.sde","HOC_TEST_Admin.sde","HOC_PROD_Admin.sde",
                      "Surveillance_DEV_Admin.sde","Surveillance_TEST_Admin.sde","Surveillance_PROD_Admin.sde"]
 # APRX Files Directory
-RESTAprxDirectory = f"//{server_name}/d/RESTServices"
+restAprxDirectory = f"//{server_name}/d/RESTServices"
 # Credentials files for ArcGIS Online and ArcGIS Server
 serverCredsFile = f"//{server_name}/D/PythonScripts/creds/hashServerProd.txt"
 agoCredsFile = f"//{server_name}/D/PythonScripts/creds/hashAGOIT.txt"
@@ -365,10 +365,10 @@ def GetDomainData(domainTable, databaseFileDirectory, domainUsageTable, database
         print("Data was collected, but the database could not be updated. Tables may be empty or inconsistent.")
 
 # APRX File Data Function
-def GetArcGISProRESTData(RESTAprxDirectory):
+def GetArcGISProRESTData(restAprxDirectory):
 
     # ArcGIS Pro Documents REST Directory ====================
-    root_path = Path(RESTAprxDirectory)
+    root_path = Path(restAprxDirectory)
     aprx_files = list(root_path.rglob('*.aprx'))
     arcpy.management.DeleteRows(restAprxDatabaseTable)
     aprxRESTfields = ["path_windows", "mapName", "layerName", "layerID", "ServerName", "DatabaseName", "DatasetName", "Datasource"]
@@ -493,7 +493,7 @@ def main():
     GetDomainData(domainTable,databaseFileDirectory,domainUsageTable)
 
     print("Updating ArcGIS Pro REST Data...")
-    GetArcGISProRESTData(RESTAprxDirectory)
+    GetArcGISProRESTData(restAprxDirectory)
 
     print("Updating Database Content...")
     UpdateDatabaseContentTable(databaseInventoryTable)
