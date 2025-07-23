@@ -403,7 +403,7 @@ def GetArcGISProRESTData(restAprxDirectory):
                     insertCursor.insertRow(row)
 
 # Database Content Function
-def UpdateDatabaseContentTable(databaseInventoryTable):
+def UpdateDatabaseContentTable(databaseInventoryTable, databaseFileNames, databaseFileDirectory):
 
     arcpy.management.DeleteRows(databaseInventoryTable)
     inventoryTableFieldList = ['databaseRoot', 'databaseCollectionName', 'datasetName', 'datasetType', 'geometryType', 'path', 'Datasource']
@@ -496,7 +496,7 @@ def main():
     GetArcGISProRESTData(restAprxDirectory)
 
     print("Updating Database Content...")
-    UpdateDatabaseContentTable(databaseInventoryTable)
+    UpdateDatabaseContentTable(databaseInventoryTable, databaseFileNames, databaseFileDirectory)
 
 # Main function
 main()
