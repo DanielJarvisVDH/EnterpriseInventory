@@ -11,6 +11,9 @@ import os
 from pathlib import Path
 import json
 
+# Organization Parameters start
+# =======================
+
 server_name = socket.gethostname()
 
 # Path to DB where your inventory tables are stored
@@ -56,6 +59,11 @@ with open(agoCredsFile, 'r') as f:
 ago_url = "https://ahs-vt.maps.arcgis.com/"
 ags_Base_URLs = ["https://maps.healthvermont.gov","https://mapstest.healthvermont.gov"]
 
+# =======================
+# Organization Parameters end
+
+
+# Utility functions
 
 # ArcGIS Online Function
 def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
@@ -243,6 +251,8 @@ def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, 
             services = server.services.list(folder=folder)  
             for service in services:
 
+                status_dict = service.status
+                service_status = status_dict.get('realTimeState', 'UNKNOWN')
                 serviceName = service.properties['serviceName']
                 serviceType = service.properties['type']
 
@@ -273,12 +283,25 @@ def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, 
                                 "serviceType": serviceType,
                                 "layerName": layer_name,
                                 "LayerID": layer_id,
-                                "serviceLayerURL": f"{service_url}/{layer_id}"
+                                "serviceLayerURL": f"{service_url}/{layer_id}",
+                                "serviceStatus": service_status
                             })
+                    else:
+                        layer_name = 'N/A'
+                        layer_id = 'N/A'
+                        services_info.append({
+                            "serviceURL": service_url,
+                            "serviceName": serviceName,
+                            "serviceType": serviceType,
+                            "layerName": layer_name,
+                            "LayerID": layer_id,
+                            "serviceLayerURL": f"{service_url}/{layer_id}",
+                            "serviceStatus": service_status
+                        })
 
     # Write to database table after clearing existing rows
     arcpy.management.TruncateTable(arcGISServerInventoryTable)
-    fields = ["serviceURL","serviceName","serviceType","layerName","layerID","serviceLayerURL"]
+    fields = ["serviceURL","serviceName","serviceType","layerName","layerID","serviceLayerURL","serviceStatus"]
     with arcpy.da.InsertCursor(arcGISServerInventoryTable, fields) as insertCursor:
         for service in services_info:
             serviceURL = service['serviceURL']
@@ -287,7 +310,8 @@ def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, 
             layerName = service['layerName']
             layerID = service['LayerID']
             serviceLayerURL = service['serviceLayerURL']
-            row = (serviceURL, serviceName, serviceType, layerName, layerID, serviceLayerURL)
+            serviceStatus = service['serviceStatus']
+            row = (serviceURL, serviceName, serviceType, layerName, layerID, serviceLayerURL, serviceStatus)
             insertCursor.insertRow(row)
 
 # Domain Data Function
