@@ -24,7 +24,16 @@ Daniel Jarvis (daniel.jarvis@vermont.gov)
          =======================
          =======================
          Organization Parameters end
-      Set up an update cycle for this script to run that matches your organization's needs
+      Set up an update cycle for this script to run that matches your organization's needs. I use FME Form and Flow. Reach out for assistance with this.
 3) Create an APRX file with an empy featureclass (a placeholder because ArcGIS Server requires a featureclass for a service to be published) and the inventory tables, then publish a REST service from this map
-4) Download the index.html, app.js, and style.css files from this repository and store on your application server of choice. The following is an implementation that "piggybacks" on the the standalone ArcGIS Server web server
-      On your application server that hosts standalone arcgisserver, place the html, js, and style files together in a single folder with a name of your choice. In this example I have placed them in a folder called EnterpriseInventory 
+4) Download the index.html, app.js, and style.css files from this repository and store on your application server of choice. The following is an implementation that "piggybacks" on the the standalone ArcGIS Server web server. On your application server that hosts standalone arcgisserver, place the html, js, and style files together in a single folder with a name of your choice within the webapps folder in the tomcat directory. If a webapps folder does not exist, create it first. In this example I have placed them in a folder called EnterpriseInventory:
+<img width="935" height="181" alt="image" src="https://github.com/user-attachments/assets/dc660767-6624-493f-ad36-841a5464bbbc" />
+5) Log into your reverse proxy server that ArcGIS Server is run through to expose the application externally, open IIS, and create a URL rewrite rule with the following parameters:
+      Name: the name of your folder - in this case I am using EnterpriseInventory
+      Pattern: the folder name and wildcards for finding the folder - in this case I wrote ^EnterpriseInventory/?(.*)
+      Action Properties: this should include the external ip of your Application Server, and a port that is open both between your servers and to the external use where the application will be used, and will be in the form https://exeternalip:port/EnterpriseInventory/{R:1} 
+<img width="1353" height="936" alt="image" src="https://github.com/user-attachments/assets/8f3e2387-3474-4514-8d08-8121a117a2e4" />
+
+That should do it. Reach out to me for questions.
+
+
