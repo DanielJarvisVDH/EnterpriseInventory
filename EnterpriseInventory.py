@@ -72,8 +72,9 @@ def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
     for its underlying data sources. The results, including item details and the
     data source name and URL, are written to SQL.
 
-    This function handles a wide variety of item types, including services, web maps,
-    scenes, and various application types, to create a comprehensive catalog.
+    This function is compatible with multiple versions of the arcgis Python API by
+    converting the user.folders property (which may be a list or a generator)
+    to a list, and then inspecting its contents to determine the correct processing path.
     """
 
     # Container for all data prior to SQL insertion    
@@ -89,15 +90,28 @@ def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
     user_folders = {}
     for user in users:
         userName = user.username
-        folders = user.folders
-        for folder in folders:
-            folderProperties = folder.properties
-            if 'name' in folderProperties:
-                pass # This tests for root, which is handled later
+
+        # In newer versions, user.folders is a generator, which is not subscriptable.
+        # Convert it to a list to safely handle both generators (new API) and lists (old API).
+        folders_list = list(user.folders)
+        
+        if userName not in user_folders:
+            user_folders[userName] = {}
+
+        # Check if the user has any folders to process
+        if folders_list:
+            # Check the type of the first element to determine API behavior.
+            if isinstance(folders_list[0], dict):
+                # --- Path for OLDER arcgis versions (returns list of dictionaries) ---
+                for folder in folders_list:
+                    if 'id' in folder and 'title' in folder:
+                        user_folders[userName][folder['id']] = folder['title']
             else:
-                if userName not in user_folders:
-                    user_folders[userName] = {}
-                user_folders[userName][folderProperties['id']] = folderProperties['title']
+                # --- Path for NEWER arcgis versions (returns list/generator of Folder objects) ---
+                for folder in folders_list:
+                    folderProperties = folder.properties
+                    if 'id' in folderProperties and 'title' in folderProperties:
+                        user_folders[userName][folderProperties['id']] = folderProperties['title']
 
     # --- Helper function for recursive parsing of data sources within maps and applications ---
     def _parse_layers_recursively(layer_list, parent_item_for_debug):
@@ -225,7 +239,6 @@ def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
     except Exception as e:
         print(f"\nFATAL ERROR during database operation: {e}")
         print("Data was collected but the database could not be updated. The table may be empty or in an inconsistent state.")
-
 # ArcGIS Server Function
 def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword):
     """ Connects to ArcGIS Server instances, retrieves service information,
