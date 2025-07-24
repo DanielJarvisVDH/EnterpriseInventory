@@ -241,92 +241,120 @@ def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
         print("Data was collected but the database could not be updated. The table may be empty or in an inconsistent state.")
 # ArcGIS Server Function
 def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword):
-    """ Connects to ArcGIS Server instances, retrieves service information,
-    and writes service details to a SQL table.
     """
+    Connects to ArcGIS Server instances, retrieves service information, and writes
+    service details to a SQL table.
 
-    # List to store service information
+    This function is highly version-agnostic and compatible with modern (11.x) and
+    very old (10.x) ArcGIS Enterprise environments. It handles three layers of
+    potential API version differences:
+    1. The services manager access point ('server.services' vs. 'server.manager').
+    2. The structure of the returned folder list (list vs. generator).
+    3. The method for accessing service properties (direct attribute vs. '.properties' dict).
+    """
     services_info = []
 
     for ags_Base_URL in ags_Base_URLs:
-
-        server = Server(url=f"{ags_Base_URL}/arcgis/admin",
+        try:
+            server = Server(url=f"{ags_Base_URL}/arcgis/admin",
                             token_url=f"{ags_Base_URL}/arcgis/tokens/generateToken",
                             username=agsUsername,
-                            password=agsPassword,)
-        
-        # Get all directories in the server
-        folders = server.services.folders
-
-        # Iterate through each folder
-        for folder in folders:
-            # Get services in the folder
-            services = server.services.list(folder=folder)  
-            for service in services:
-
-                status_dict = service.status
-                service_status = status_dict.get('realTimeState', 'UNKNOWN')
-                serviceName = service.properties['serviceName']
-                serviceType = service.properties['type']
-
-                if folder == "/":
-                    folderDirectory = "/"
+                            password=agsPassword)
+            try:
+                # --- Find the correct Service Manager ---
+                if hasattr(server, 'services'):
+                    # MODERN PATH (arcgis API >= 1.5)
+                    service_manager = server.services
+                elif hasattr(server, 'manager'):
+                    # LEGACY PATH (arcgis API < 1.5)
+                    service_manager = server.manager
                 else:
-                    folderDirectory = f"/{folder}/"
+                    print(f"ERROR: Could not find a valid services manager on server object for {ags_Base_URL}. Skipping.")
+                    continue # Skip to the next server
 
-                # Get service details
-                service_url = f"{ags_Base_URL}/arcgis/rest/services{folderDirectory}{serviceName}/{serviceType}"
-                
-                # Request the service details
-                response = requests.get(f"{service_url}?f=json")
-                if response.status_code == 200:
-                    service_data = response.json()
+                folders = list(service_manager.folders)
+                if '/' not in folders:
+                    folders.insert(0, '/')
 
-                    # Check if the service has layers
-                    if 'layers' in service_data:
+                for folder in folders:
+                    # For root folder, the folder parameter must be an empty string or not present
+                    current_folder_path = folder if folder != '/' else ""
+                    services = service_manager.list(folder=current_folder_path)
+                    
+                    for service in services:
+                        try:
+                            # Inner Try/Except for property access
+                            try:
+                                # Modern property access
+                                serviceName = service.properties['serviceName']
+                                serviceType = service.properties['type']
+                            except (AttributeError, KeyError):
+                                # Legacy property access
+                                serviceName = service.serviceName
+                                serviceType = service.type
 
-                        for layer in service_data['layers']:
-                            layer_name = layer['name']
-                            layer_id = layer['id']
+                            status_dict = service.status
+                            service_status = status_dict.get('realTimeState', 'UNKNOWN')
                             
-                            # Append the information to the list
-                            services_info.append({
-                                "serviceURL": service_url,
-                                "serviceName": serviceName,
-                                "serviceType": serviceType,
-                                "layerName": layer_name,
-                                "LayerID": layer_id,
-                                "serviceLayerURL": f"{service_url}/{layer_id}",
-                                "serviceStatus": service_status
-                            })
-                    else:
-                        layer_name = 'N/A'
-                        layer_id = 'N/A'
-                        services_info.append({
-                            "serviceURL": service_url,
-                            "serviceName": serviceName,
-                            "serviceType": serviceType,
-                            "layerName": layer_name,
-                            "LayerID": layer_id,
-                            "serviceLayerURL": f"{service_url}/{layer_id}",
-                            "serviceStatus": service_status
-                        })
+                            folderDirectory = "/" if folder == "/" else f"/{folder}/"
+                            service_url = f"{ags_Base_URL}/arcgis/rest/services{folderDirectory}{serviceName}/{serviceType}"
 
-    # Write to database table after clearing existing rows
-    arcpy.management.TruncateTable(arcGISServerInventoryTable)
-    fields = ["serviceURL","serviceName","serviceType","layerName","layerID","serviceLayerURL","serviceStatus"]
-    with arcpy.da.InsertCursor(arcGISServerInventoryTable, fields) as insertCursor:
-        for service in services_info:
-            serviceURL = service['serviceURL']
-            serviceName = service['serviceName']
-            serviceType = service['serviceType']
-            layerName = service['layerName']
-            layerID = service['LayerID']
-            serviceLayerURL = service['serviceLayerURL']
-            serviceStatus = service['serviceStatus']
-            row = (serviceURL, serviceName, serviceType, layerName, layerID, serviceLayerURL, serviceStatus)
-            insertCursor.insertRow(row)
+                            response = requests.get(f"{service_url}?f=json", verify=False) # Added verify=False for older servers with SSL issues
+                            if response.status_code == 200:
+                                service_data = response.json()
+                                if 'layers' in service_data and service_data['layers']:
+                                    for layer in service_data['layers']:
+                                        services_info.append({
+                                            "serviceURL": service_url,
+                                            "serviceName": serviceName,
+                                            "layerType": layer.get('type', 'Unknown Type'),
+                                            "serviceType": serviceType,
+                                            "layerName": layer.get('name', 'N/A'),
+                                            "LayerID": layer.get('id', None),
+                                            "serviceLayerURL": f"{service_url}/{layer.get('id', '')}",
+                                            "serviceStatus": service_status
+                                        })
+                                else:
+                                    services_info.append({
+                                        "serviceURL": service_url,
+                                        "serviceName": serviceName,
+                                        "serviceType": serviceType,
+                                        "layerName": 'N/A',
+                                        "layerType": 'N/A',
+                                        "LayerID": None,
+                                        "serviceLayerURL": service_url,
+                                        "serviceStatus": service_status
+                                    })
+                            else:
+                                print(f"Warning: Could not access REST endpoint for {service_url}. Status: {response.status_code}")
+                        except Exception as inner_e:
+                            print(f"ERROR: Could not process service '{getattr(service, 'serviceName', 'UNKNOWN')}' in folder '{folder}'. Details: {inner_e}")
 
+            except Exception as e:
+                print(f"FATAL ERROR processing server {ags_Base_URL}: {e}")
+                continue # Move to the next server in the list
+
+        except Exception as conn_e:
+            print(f"FATAL ERROR connecting to server {ags_Base_URL}: {conn_e}")
+            
+    # --- Update SQL Table ---
+    try:
+        arcpy.management.TruncateTable(arcGISServerInventoryTable)
+        fields = ["serviceURL","serviceName","serviceType","layerName","layerType","layerID","serviceLayerURL","serviceStatus"]
+        with arcpy.da.InsertCursor(arcGISServerInventoryTable, fields) as insertCursor:
+            for service in services_info:
+                row = (service["serviceURL"], 
+                       service["serviceName"], 
+                       service["serviceType"],
+                       service["layerName"],
+                       service["layerType"],
+                       service["LayerID"],
+                       service["serviceLayerURL"],
+                       service["serviceStatus"]
+                       )
+                insertCursor.insertRow(row)
+    except Exception as db_e:
+        print(f"FATAL ERROR during database write operation: {db_e}")
 # Domain Data Function
 def GetDomainData(domainTable, databaseFileDirectory, domainUsageTable, databaseFileNames):
     """
