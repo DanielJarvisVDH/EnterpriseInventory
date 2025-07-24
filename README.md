@@ -10,10 +10,6 @@ For the Web Application to function as intented, you must produce a REST service
 
 Note that all code has been developed to mask servers, credentials, and identifiable information. If you use this code you should follow those same principles to protect sensitive information.
 
-Please reach out to me for implementation questions
-
-Daniel Jarvis (daniel.jarvis@vermont.gov)
-
 
 # Deployment Instructions:
 
@@ -36,4 +32,4 @@ Daniel Jarvis (daniel.jarvis@vermont.gov)
 
 That should do it. Reach out to me for questions.
 
-
+Daniel Jarvis (daniel.jarvis@vermont.gov)
