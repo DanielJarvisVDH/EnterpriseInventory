@@ -239,6 +239,7 @@ def GetAGODataSources(ago_url, agoInventoryTable, agoUsername, agoPassword):
     except Exception as e:
         print(f"\nFATAL ERROR during database operation: {e}")
         print("Data was collected but the database could not be updated. The table may be empty or in an inconsistent state.")
+
 # ArcGIS Server Function
 def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword):
     """
@@ -355,6 +356,7 @@ def GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, 
                 insertCursor.insertRow(row)
     except Exception as db_e:
         print(f"FATAL ERROR during database write operation: {db_e}")
+
 # Domain Data Function
 def GetDomainData(domainTable, databaseFileDirectory, domainUsageTable, databaseFileNames):
     """
@@ -469,81 +471,120 @@ def GetArcGISProRESTData(restAprxDirectory):
 
 # Database Content Function
 def UpdateDatabaseContentTable(databaseInventoryTable, databaseFileNames, databaseFileDirectory):
+    """
+    Inventories the contents of enterprise geodatabases and populates a table with the findings.
+    This script is designed to be compatible with multiple ArcGIS Pro versions.
+    """
+    try:
+        # A list to hold dictionaries, where each dictionary represents a row.
+        collected_data = []
 
-    arcpy.management.DeleteRows(databaseInventoryTable)
-    inventoryTableFieldList = ['databaseRoot', 'databaseCollectionName', 'datasetName', 'datasetType', 'geometryType', 'path', 'Datasource']
-    # Loop through each database and add the data for each object in the database
-    with arcpy.da.InsertCursor(databaseInventoryTable, inventoryTableFieldList) as insertCursor:
+        # --- Step 1: Data Collection ---
+        # Loop through each database to collect information.
         for database in databaseFileNames:
             sde_connection = f"{databaseFileDirectory}/{database}"
+            
+            # Describe the connection to get properties.
             describeConnection = arcpy.Describe(sde_connection)
-            serverName = describeConnection.connectionProperties.server
+            connection_props = describeConnection.connectionProperties
+            
+            serverName = "Unknown"  # Default value
+            # For newer versions of ArcGIS Pro (e.g., 3.3+)
+            if hasattr(connection_props, 'server'):
+                serverName = connection_props.server
+            # For older versions (e.g., 3.2), fall back to the 'instance' property.
+            elif hasattr(connection_props, 'instance'):
+                instance_string = connection_props.instance
+                serverName = instance_string.split('\\')[0]
 
+            # Use arcpy.da.Walk to traverse the geodatabase.
             for root, collections, tables in arcpy.da.Walk(sde_connection, datatype="Any", type="ALL"):
                 if root == sde_connection:
+                    # This section processes the root of the geodatabase and items located there.
+                    # Add a dictionary for the database connection itself.
+                    collected_data.append({
+                        'databaseRoot': database,
+                        'databaseCollectionName': None,
+                        'datasetName': None,
+                        'datasetType': "Enterprise Geodatabase",
+                        'geometryType': None,
+                        'path': sde_connection,
+                        'Datasource': f"{serverName}|"
+                    })
 
-                    # Root of database parameters
-                    collectionName = None
-                    datasetName = None
-                    datasetType = "Enterprise Geodatabase"
-                    geometryType = None
-                    datasetPath = database
-                    dataSource = f"{serverName}|{datasetName}"
-                    row = [database, collectionName, datasetName, datasetType, geometryType, sde_connection, dataSource]
-                    insertCursor.insertRow(row)
-
-                    # Get root contents
+                    # Process tables and feature classes at the root.
                     for table in tables:
-                        collectionName = None
-                        datasetName = table
-                        datasetPath = os.path.join(root, datasetName)
-                        if arcpy.Exists(datasetPath):
-                            datasetDescription = arcpy.Describe(datasetPath)
-                            datasetType = datasetDescription.dataType
-                            if str(datasetType.lower()) == "featureclass":
-                                geometryType = datasetDescription.shapeType
-                            else:
-                                geometryType = None
-                        else:
-                            datasetType = "POTENTIALLY CORRUPTED DATASET"
-                            geometryType = "POTENTIALLY CORRUPTED DATASET"
-                        dataSource = f"{serverName}|{datasetName}"
-                        row = [database, collectionName, datasetName, datasetType, geometryType, datasetPath, dataSource]
-                        insertCursor.insertRow(row)
+                        datasetPath = os.path.join(root, table)
+                        datasetDescription = arcpy.Describe(datasetPath) if arcpy.Exists(datasetPath) else None
+                        
+                        datasetType = datasetDescription.dataType if datasetDescription else "POTENTIALLY CORRUPTED DATASET"
+                        geometryType = None
+                        if datasetDescription and str(datasetType).lower() == "featureclass":
+                            geometryType = datasetDescription.shapeType
+                        
+                        collected_data.append({
+                            'databaseRoot': database,
+                            'databaseCollectionName': None,
+                            'datasetName': table,
+                            'datasetType': datasetType,
+                            'geometryType': geometryType,
+                            'path': datasetPath,
+                            'Datasource': f"{serverName}|{table}"
+                        })
 
                 else:
-                    # Root of collection parameters
+                    # This section processes collections (things like Feature Datasets) and their contents.
                     collectionName = os.path.basename(root)
-                    datasetName = None
                     collectionDescription = arcpy.Describe(root)
-                    collectionType = collectionDescription.dataType
-                    geometryType = None
-                    collectionPath = root
-                    dataSource = f"{serverName}|{datasetName}"
-                    row = [database, collectionName, datasetName, collectionType, geometryType, collectionPath, dataSource]
-                    insertCursor.insertRow(row)
+                    
+                    # Add a dictionary for the collection.
+                    collected_data.append({
+                        'databaseRoot': database,
+                        'databaseCollectionName': collectionName,
+                        'datasetName': None,
+                        'datasetType': collectionDescription.dataType,
+                        'geometryType': None,
+                        'path': root,
+                        'Datasource': f"{serverName}|"
+                    })
                 
-                    # Get collection contents
+                    # Process contents of the collection.
                     for table in tables:
-                        collectionName = root
-                        datasetName = table
-                        datasetPath = os.path.join(root, datasetName)
-                        if arcpy.Exists(datasetPath):
-                            datasetDescription = arcpy.Describe(datasetPath)
-                            datasetType = datasetDescription.dataType
-                            if str(datasetType.lower()) == "featureclass":
-                                geometryType = datasetDescription.shapeType
-                            else:
-                                geometryType = None
-                        else:
-                            datasetType = "POTENTIALLY CORRUPTED DATASET"
-                            geometryType = "POTENTIALLY CORRUPTED DATASET"
-                        dataSource = f"{serverName}|{datasetName}"
-                        row = [database, collectionName, datasetName, datasetType, geometryType, datasetPath, dataSource]
-                        insertCursor.insertRow(row)
+                        datasetPath = os.path.join(root, table)
+                        datasetDescription = arcpy.Describe(datasetPath) if arcpy.Exists(datasetPath) else None
+                        
+                        datasetType = datasetDescription.dataType if datasetDescription else "POTENTIALLY CORRUPTED DATASET"
+                        geometryType = None
+                        if datasetDescription and str(datasetType).lower() == "featureclass":
+                            geometryType = datasetDescription.shapeType
+                            
+                        collected_data.append({
+                            'databaseRoot': database,
+                            'databaseCollectionName': collectionName,
+                            'datasetName': table,
+                            'datasetType': datasetType,
+                            'geometryType': geometryType,
+                            'path': datasetPath,
+                            'Datasource': f"{serverName}|{table}"
+                        })
+
+        # --- Step 2: Data Update ---
+        # Now that all data is collected, update the database table.
+        arcpy.management.DeleteRows(databaseInventoryTable)
+        inventoryTableFieldList = ['databaseRoot', 'databaseCollectionName', 'datasetName', 'datasetType', 'geometryType', 'path', 'Datasource']        
+        with arcpy.da.InsertCursor(databaseInventoryTable, inventoryTableFieldList) as insertCursor:
+            for data_row in collected_data:
+                # Create a list of values in the correct order for insertion.
+                row_to_insert = [data_row[field] for field in inventoryTableFieldList]
+                insertCursor.insertRow(row_to_insert)
+                
+    except arcpy.ExecuteError as e:
+        print(f"An ArcPy error occurred: {e}")
+    except Exception as e:
+        print(f"A general error occurred: {e}")
 
 # PowerBI Data is handled elsewhere, but included as a comment here as a reminder
-#def UpdatePBIDataSources(PBIInventoryTable, PBIUsername, PBIPassword):
+#def UpdatePBIDataSources():
 #    pass
 
 # Main Function
@@ -555,7 +596,7 @@ def main():
     GetArcGISServerData(arcGISServerInventoryTable, ags_Base_URLs, agsUsername, agsPassword)
 
     print("Updating Domain Data...")
-    GetDomainData(domainTable,databaseFileDirectory,domainUsageTable)
+    GetDomainData(domainTable, databaseFileDirectory, domainUsageTable, databaseFileNames)
 
     print("Updating ArcGIS Pro REST Data...")
     GetArcGISProRESTData(restAprxDirectory)
