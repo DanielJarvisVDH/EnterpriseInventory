@@ -399,13 +399,14 @@ def GetDomainData(domainTable, databaseFileDirectory, domainUsageTable, database
                 fds_datasets = arcpy.ListFeatureClasses(feature_dataset=fds) + arcpy.ListTables(fds)
                 for fds_dataset in fds_datasets:
                     fds_dataset_basename = fds_dataset.split('.')[-1]
-                    datasets.append(f"{fds}.{fds_dataset_basename}")
+                    datasets.append(f"{fds}/{fds_dataset_basename}")
             for item in datasets: # This takes a while
-                fields = arcpy.ListFields(item)
-                for field in fields:
-                    if field.domain:
-                        row = (database, item, field.name, field.domain)
-                        domain_usage_data_store.append(row)
+                if arcpy.Exists(item):
+                    fields = arcpy.ListFields(item)
+                    for field in fields:
+                        if field.domain:
+                            row = (database, item, field.name, field.domain)
+                            domain_usage_data_store.append(row)
         except Exception as e:
             print(f"    ERROR processing domain usage in {database}: {e}")
 
